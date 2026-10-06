@@ -1359,7 +1359,7 @@
     "com.oplus.blockVibration.delay"
    ],
    "notInvokes": [
-    "Landroid/os/ConditionVariable;->block(J)Z"
+    "@SoundPlayer.waitRingerReady"
    ]
   },
   "SoundPlayer.unsilence": {
@@ -1370,7 +1370,7 @@
    ],
    "ret": "void",
    "invokes": [
-    "Landroid/os/ConditionVariable;->block(J)Z"
+    "@SoundPlayer.waitRingerReady"
    ]
   },
   "SoundPlayer.refresh": {
@@ -1630,6 +1630,73 @@
    "in": "com.oplus.camera.control.MainShutterButton",
    "name": "k1",
    "type": "int"
+  },
+  "SoundPlayer.waitRingerReady": {
+   "kind": "method",
+   "in": "@SoundPlayer",
+   "params": [],
+   "ret": "void",
+   "invokes": [
+    "Landroid/os/ConditionVariable;->block(J)Z"
+   ]
+  },
+  "ModeDb": {
+   "kind": "class",
+   "strings": [
+    "com.oplus.camera.mode.data.db.version"
+   ]
+  },
+  "ModeDb.initialize": {
+   "kind": "method",
+   "in": "@ModeDb",
+   "params": [],
+   "ret": "void",
+   "strings": [
+    "initialize, app version is changed",
+    "initialize, db is not exist"
+   ]
+  },
+  "ModeDb.query": {
+   "kind": "method",
+   "in": "@ModeDb",
+   "params": [
+    "java.lang.String",
+    "boolean",
+    "boolean"
+   ],
+   "ret": "java.util.ArrayList",
+   "strings": [
+    "select * from mode_info where position = ?"
+   ]
+  },
+  "ModeDb.addHeadline": {
+   "kind": "method",
+   "in": "@ModeDb",
+   "params": [
+    "android.database.sqlite.SQLiteDatabase",
+    "java.util.List",
+    "java.util.List"
+   ],
+   "ret": "void",
+   "strings": [
+    "com.oplus.gr.mode.support",
+    "position_headline"
+   ]
+  },
+  "ModeDb.addPanel": {
+   "kind": "method",
+   "in": "@ModeDb",
+   "params": [
+    "android.database.sqlite.SQLiteDatabase",
+    "java.util.List",
+    "java.util.List"
+   ],
+   "ret": "void",
+   "strings": [
+    "com.oplus.feature.retro.camera.support",
+    "position_mode_panel",
+    "panorama"
+   ]
   }
  },
  "gallery": {

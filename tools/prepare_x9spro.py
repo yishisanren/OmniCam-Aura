@@ -1,0 +1,272 @@
+"""Generate PME110 overlays by merging narrow additions into its own firmware.
+
+The input snapshots are private and intentionally excluded from Git. No camera
+IDs, calibration, MTK vendor flags or pre-existing capture pipelines are copied
+from PMA110. Requires the upstream resource tree and decoded original configs.
+"""
+from pathlib import Path
+import copy
+import hashlib
+import json
+import re
+import shutil
+
+ROOT = Path(__file__).resolve().parent.parent
+STOCK = ROOT / 'evidence/original'
+DONOR = ROOT / 'evidence/upstream-module'
+MODULE = ROOT / 'module'
+
+
+def read_json(path):
+    # Android's JSON parser permits comments and literal newlines in strings.
+    text = path.read_text()
+    text = re.sub(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*[\s\S]*?\*/',
+                  lambda m: m[0] if m[0].startswith('"') else '', text)
+    return json.loads(text, strict=False)
+
+
+def write_json(path, data):
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
+
+
+def varint(data, pos):
+    value = shift = 0
+    while True:
+        byte = data[pos]
+        pos += 1
+        value |= (byte & 127) << shift
+        if byte < 128:
+            return value, pos
+        shift += 7
+        if shift > 63:
+            raise ValueError('invalid varint')
+
+
+def encode_varint(value):
+    data = bytearray()
+    while value > 127:
+        data.append((value & 127) | 128)
+        value >>= 7
+    data.append(value)
+    return bytes(data)
+
+
+def parse_wire(data):
+    fields = []
+    pos = 0
+    while pos < len(data):
+        tag, pos = varint(data, pos)
+        wire = tag & 7
+        if wire == 2:
+            size, pos = varint(data, pos)
+            value = data[pos:pos + size]
+            if len(value) != size:
+                raise ValueError('truncated protobuf')
+            pos += size
+        elif wire == 0:
+            value, pos = varint(data, pos)
+        else:
+            raise ValueError(f'unsupported protobuf wire {wire}')
+        fields.append((tag >> 3, wire, value))
+    return fields
+
+
+def encode_wire(fields):
+    return b''.join(encode_varint((field << 3) | wire) +
+                    (encode_varint(len(value)) + value if wire == 2 else encode_varint(value))
+                    for field, wire, value in fields)
+
+
+def feature_overlay():
+    original = parse_wire((STOCK / 'config/camera_unit_feature_config.protobuf').read_bytes())
+    donor = parse_wire((DONOR / 'payload/camera_unit_feature_config.protobuf').read_bytes())
+    pool = [v for n, w, v in original if n == 1]
+    donor_pool = [v for n, w, v in donor if n == 1]
+    extra = []
+
+    def remap(index):
+        value = donor_pool[index]
+        if value not in pool:
+            pool.append(value)
+            extra.append((1, 2, value))
+        return pool.index(value)
+
+    def conflict_list(data):
+        return encode_wire([(n, w, encode_wire([(f, wire, remap(v))
+                             for f, wire, v in parse_wire(item)]))
+                            for n, w, item in parse_wire(data)])
+
+    def feature(data):
+        out = []
+        for n, w, value in parse_wire(data):
+            if 1 <= n <= 6:
+                value = remap(value)
+            elif n == 8:
+                value = encode_wire([(f, wire, remap(v) if f == 1 else conflict_list(v))
+                                     for f, wire, v in parse_wire(value)])
+            out.append((n, w, value))
+        return encode_wire(out)
+
+    def mode_table(data):
+        out = []
+        for n, w, item in parse_wire(data):
+            pair = parse_wire(item)
+            camera_index = next(v for f, wire, v in pair if f == 1)
+            if donor_pool[camera_index] == b'rear_ultra_tele':
+                continue
+            mapped = []
+            for f, wire, value in pair:
+                value = remap(value) if f == 1 else encode_wire(
+                    [(ff, ww, feature(vv)) for ff, ww, vv in parse_wire(value)])
+                mapped.append((f, wire, value))
+            out.append((n, w, encode_wire(mapped)))
+        return encode_wire(out)
+
+    additions = []
+    donor_highpixel = {}
+    for n, w, data in donor:
+        if n != 2:
+            continue
+        for f, wire, entry in parse_wire(data):
+            fields = parse_wire(entry)
+            name = next(v for ff, ww, v in fields if ff == 1)
+            if name == b'high_pixel_mode':
+                cameras = next(v for ff, ww, v in fields if ff == 2)
+                for _, _, camera in parse_wire(cameras):
+                    values = dict((ff, v) for ff, ww, v in parse_wire(camera))
+                    donor_highpixel[donor_pool[values[1]]] = parse_wire(values[2])
+            if name in [b'gr_mode', b'retro_camera_mode']:
+                additions.append((f, wire, encode_wire(
+                    [(ff, ww, v if ff == 1 else mode_table(v)) for ff, ww, v in fields])))
+    result = []
+    for n, w, value in original:
+        if n == 2:
+            entries = []
+            for field, wire, entry in parse_wire(value):
+                mode = parse_wire(entry)
+                if next(v for f, ww, v in mode if f == 1) == b'high_pixel_mode':
+                    cameras = []
+                    for cf, cw, camera in parse_wire(next(v for f, ww, v in mode if f == 2)):
+                        parts = parse_wire(camera)
+                        camera_name = pool[next(v for f, ww, v in parts if f == 1)]
+                        features = parse_wire(next(v for f, ww, v in parts if f == 2))
+                        if camera_name in {b'front_main', b'rear_main', b'rear_wide', b'rear_tele'}:
+                            existing = {tuple(v for f, ww, v in parse_wire(data) if f in [1, 2]) for _, _, data in features}
+                            for ff, fw, data in donor_highpixel[camera_name]:
+                                values = dict((f, v) for f, ww, v in parse_wire(data))
+                                if donor_pool[values[1]] not in {b'com.oplus.camera.feature.filter', b'com.oplus.camera.feature.beauty'}:
+                                    continue
+                                mapped = feature(data)
+                                identity = tuple(v for f, ww, v in parse_wire(mapped) if f in [1, 2])
+                                if identity not in existing:
+                                    features.append((ff, fw, mapped))
+                                    existing.add(identity)
+                        cameras.append((cf, cw, encode_wire([(f, ww, encode_wire(features) if f == 2 else v) for f, ww, v in parts])))
+                    mode = [(f, ww, encode_wire(cameras) if f == 2 else v) for f, ww, v in mode]
+                    entry = encode_wire(mode)
+                entries.append((field, wire, entry))
+            value = encode_wire(entries + additions)
+        result.append((n, w, value))
+    # String indices reference the concatenation of all repeated field-1 values.
+    result += extra
+    (MODULE / 'payload/camera_unit_feature_config.protobuf').write_bytes(encode_wire(result))
+
+
+def main():
+    unit = read_json(STOCK / 'config/camera_unit_config')
+    original_unit = copy.deepcopy(unit)
+    for camera, modes in unit['mode_type_list'].items():
+        for new, base in [('gr_mode', 'professional_mode'), ('retro_camera_mode', 'photo_mode')]:
+            if base in modes and new not in modes:
+                modes.append(new)
+    for new, base in [('gr_mode', 'professional_mode'), ('retro_camera_mode', 'photo_mode')]:
+        unit['mode_operation_mode'][new] = unit['mode_operation_mode'][base]
+        if base in unit['capture_stream_number']:
+            unit['capture_stream_number'][new] = copy.deepcopy(unit['capture_stream_number'][base])
+    for new, base in [('gr_mode_case', 'professional_case'), ('gr_mode_hq_raw_case', 'professional_hqraw_case'),
+                      ('retro_camera_case', 'sat_photo_case')]:
+        unit['usecase_info'][new] = copy.deepcopy(unit['usecase_info'][base])
+    write_json(MODULE / 'payload/camera_unit_config', unit)
+    feature_overlay()
+
+    config = read_json(STOCK / 'oplus_camera_config.decoded.json')
+    donor_config = read_json(DONOR / 'payload/oplus_camera_config')
+    rows = {row['VendorTag']: row for row in config}
+    allow = {
+        'com.oplus.gr.mode.support', 'com.oplus.available.gr.mode.zoomvalues',
+        'com.oplus.gr.mode.marked.zoomvalues', 'com.oplus.camera.gr.raw.capture_defer.not.support',
+        'com.oplus.feature.retro.camera.support', 'com.oplus.feature.retro.camera.livephoto.output.size',
+        'com.oplus.camera.retro.fisheye.enable', 'com.oplus.feature.color.palette.support',
+        'com.oplus.ipu.color.palette.texture.support', 'com.oplus.feature.aicomposition.realscene.support',
+    }
+    changes = []
+    for row in donor_config:
+        key = row['VendorTag']
+        if key not in allow:
+            continue
+        row = copy.deepcopy(row)
+        if key == 'com.oplus.available.gr.mode.zoomvalues':
+            row['Value'] = rows['com.oplus.pro.zoom.marked.zoomvalues']['Value']
+            row['Count'] = str(len(row['Value'].split(',')))
+        if key in rows:
+            rows[key].update(row)
+        else:
+            config.append(row)
+            rows[key] = row
+        changes.append(key)
+    flash = {'VendorTag': 'com.oplus.flashlevel.configurable.support', 'Type': 'Byte', 'Count': '1', 'Value': '1'}
+    if flash['VendorTag'] in rows:
+        rows[flash['VendorTag']].update(flash)
+    else:
+        config.append(flash)
+    changes.append(flash['VendorTag'])
+    version = rows['com.oplus.camera.mode.data.db.version']
+    version['Value'] = str(int(version['Value']) + 1)
+    changes.append(version['VendorTag'])
+    write_json(MODULE / 'payload/oplus_camera_config', config)
+
+    algo = read_json(STOCK / 'oplus_camera_algo_switch_config.decoded.json')
+    original_algo = copy.deepcopy(algo)
+    for groups in ['aps_capture_configs', 'aps_preview_configs']:
+        index = {group['mode']: group for group in algo[groups]}
+        for new, base in [('retroCamera', 'common'), ('grmode', 'master')]:
+            group = copy.deepcopy(index[base])
+            group['mode'] = new
+            algo[groups].append(group)
+        if groups == 'aps_capture_configs':
+            for group in algo[groups]:
+                if group['mode'] in ['common', 'portrait', 'aiHighPixel']:
+                    for entity in group['entity']:
+                        if entity.get('enable') == 1:
+                            entity['aps_algo_color_palette'] = 1
+    write_json(MODULE / 'payload/oplus_camera_algo_switch_config', algo)
+
+    aps = read_json(STOCK / 'oplus_camera_aps_config.decoded.json')
+    # Keep all sensor, bit-depth and ISP parameters, including MTK's 8-bit BasicTone setting.
+    aps['file_data'].append({'VendorTag': 'com.oplus.color.palette.portrait.lut.weight',
+                             'Type': 'Float', 'Count': '1', 'Value': '0.85'})
+    write_json(MODULE / 'payload/oplus_camera_aps_config', aps)
+
+    for path in ['payload/isp', 'payload/gamma']:
+        shutil.rmtree(MODULE / path, ignore_errors=True)
+    (MODULE / 'system/odm/lib64/libAlgoInterface.so').unlink(missing_ok=True)
+    # The router's X9 backend is THIS device's original BasicTone, not the Qualcomm donor.
+    shutil.copy2(STOCK / 'libBasicTonePhoto.so', MODULE / 'system/odm/lib64/libBasicTonePhotoX9.so')
+    report = {
+        'model': 'PME110', 'firmware': 'PME110_17.0.0.102(CN01)', 'camera': '7.006.105',
+        'apk_sha256': hashlib.sha256((STOCK / 'OplusCamera-7.006.105.apk').read_bytes()).hexdigest(),
+        'algo_sha256': hashlib.sha256((STOCK / 'libAlgoInterface.so').read_bytes()).hexdigest(),
+        'basictone_sha256': hashlib.sha256((STOCK / 'libBasicTonePhoto.so').read_bytes()).hexdigest(),
+        'changed_config_keys': changes,
+        'gr_zoom': rows['com.oplus.available.gr.mode.zoomvalues']['Value'],
+        'untouched': ['camera IDs', 'device_info', 'MTK vendor tags', 'all original use cases',
+                      'all original protobuf modes', 'all original gamma and ISP files', 'libAlgoInterface.so'],
+        'not_enabled': ['AI inspiration remote credentials', 'Qualcomm ISP replacements'],
+    }
+    write_json(MODULE / 'profile.json', report)
+    write_json(ROOT / 'evidence/merge-report.json', report)
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+
+
+if __name__ == '__main__':
+    main()

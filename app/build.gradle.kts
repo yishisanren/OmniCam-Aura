@@ -11,8 +11,8 @@ android {
         applicationId = "local.omnicam.aura"
         minSdk = 28
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 1001
+        versionName = "1.0.1-x9spro.1"
         ndk { abiFilters += "arm64-v8a" }
         externalNativeBuild {
             cmake { arguments += listOf("-DANDROID_STL=c++_static") }
@@ -63,6 +63,9 @@ android {
         jniLibs.useLegacyPackaging = false
     }
 }
+
+// Cloud sync can create duplicate generated class/resource files during a build.
+providers.gradleProperty("auraBuildDir").orNull?.let { layout.buildDirectory.set(file(it)) }
 
 dependencies {
     compileOnly(files("libs/api-82.jar"))

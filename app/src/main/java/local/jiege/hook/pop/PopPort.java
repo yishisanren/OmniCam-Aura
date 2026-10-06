@@ -13,6 +13,11 @@ public final class PopPort {
 
     /** @param mainProcess resources are only needed in the camera's main process */
     public static void installCamera(ClassLoader classLoader, boolean mainProcess) {
+        try {
+            PopSdkConfig.install(classLoader);
+        } catch (Throwable error) {
+            Log.e(TAG, "POP photo session configuration unavailable", error);
+        }
         if (mainProcess) {
             try {
                 PopResources.install(classLoader);

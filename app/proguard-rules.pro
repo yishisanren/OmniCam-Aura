@@ -4,3 +4,4 @@
 -dontwarn de.robv.android.xposed.**
 
 -keep class local.omnicam.aura.ModuleEntry { *; }
+-keep class local.omnicam.aura.NativeStatus { *; }

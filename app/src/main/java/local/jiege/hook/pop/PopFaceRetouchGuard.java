@@ -31,7 +31,7 @@ final class PopFaceRetouchGuard {
                 if (param.hasThrowable()) return;
                 Object tag = param.args[0];
                 Object mode = XposedHelpers.getObjectField(tag, "mCaptureMode");
-                if (!(mode instanceof String) || !((String) mode).toLowerCase().contains("retro")) return;
+                if (!(mode instanceof String) || !((String) mode).toLowerCase(java.util.Locale.ROOT).contains("retro")) return;
                 if (XposedHelpers.getIntField(tag, "mRearFrontCameraId") != 0) return;
                 Object meta = param.getResult();
                 String[] algorithms = (String[]) XposedHelpers.callMethod(meta, "get", algorithmKey);

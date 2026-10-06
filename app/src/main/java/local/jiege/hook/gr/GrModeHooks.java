@@ -10,6 +10,7 @@ import local.jiege.hook.common.Log;
 import local.jiege.hook.common.Reflection;
 import local.jiege.hook.common.SuperCall;
 import local.jiege.hook.common.Symbols;
+import local.omnicam.aura.NativeStatus;
 
 /**
  * GR port: makes the realme GR mode (app GrMode, SDK GRCapMode) run on PMA110.
@@ -27,11 +28,18 @@ final class GrModeHooks {
 
     static void install(ClassLoader classLoader) throws Throwable {
         Symbols symbols = Symbols.get();
+        GrModeDatabase.install(symbols);
         SuperCall.verify();
         hookModeEntry(symbols);
         hookAppModeInheritance(symbols);
         hookSdkModeInheritance(classLoader);
         GrState.init(symbols);
+        XposedBridge.hookMethod(symbols.method("GrMode.captureStage"), new XC_MethodHook() {
+            @Override protected void afterHookedMethod(MethodHookParam param) {
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() ->
+                    Log.guard(TAG, "capture evidence", () -> Log.i(TAG, "capture " + NativeStatus.snapshot())), 2500);
+            }
+        });
         Log.guard(TAG, "GR entrance buttons", () -> hookEntranceButtons(symbols, classLoader));
         Log.guard(TAG, "GR effect branch", () -> hookMasterEffectBranch(symbols));
         Log.guard(TAG, "GR effect panel lifecycle", () -> hookEffectPanelLifecycle(symbols));
@@ -117,7 +125,7 @@ final class GrModeHooks {
             new XC_MethodHook() {
                 @Override protected void beforeHookedMethod(MethodHookParam param) {
                     View view = (View) param.thisObject;
-                    if (view.getId() <= 0 || !"switch_camera_button".equals(view.getResources().getResourceEntryName(view.getId()))) return;
+                    if (!"switch_camera_button".equals(resourceName(view))) return;
                     int visibility = (Integer) param.args[0];
                     if ((visibility == View.INVISIBLE || visibility == View.GONE) && GrState.isGrMode() && !styleChipsOpen(symbols)) {
                         param.args[0] = View.VISIBLE;
@@ -136,14 +144,23 @@ final class GrModeHooks {
             new XC_MethodHook() {
                 @Override protected void beforeHookedMethod(MethodHookParam param) {
                     View view = (View) param.thisObject;
-                    if ((Integer) param.args[0] != View.VISIBLE || !GrState.isGrMode() || view.getId() <= 0) return;
-                    String name = view.getResources().getResourceEntryName(view.getId());
+                    if ((Integer) param.args[0] != View.VISIBLE || !GrState.isGrMode()) return;
+                    String name = resourceName(view);
                     if ("camera_menu_right_enter_button".equals(name) || "camera_menu_right_enter_button_filter".equals(name)) {
                         param.args[0] = View.GONE;
                     }
                 }
             });
         XposedBridge.hookMethod(symbols.method("GrViewManager.immersiveButton"), XC_MethodReplacement.returnConstant(null));
+    }
+
+    private static String resourceName(View view) {
+        if (view.getId() == View.NO_ID || view.getId() == 0) return null;
+        try {
+            return view.getResources().getResourceEntryName(view.getId());
+        } catch (android.content.res.Resources.NotFoundException generatedId) {
+            return null;
+        }
     }
 
     /** The capture-params presenter of the activity hosting the current GR mode, or null. */

@@ -36,7 +36,7 @@ final class PopHighPixel {
                     Object tag = param.args[2];
                     if (tag == null) return;
                     Object mode = XposedHelpers.getObjectField(tag, "mCaptureMode");
-                    if (!(mode instanceof String) || !((String) mode).toLowerCase().contains("retro")) return;
+                    if (!(mode instanceof String) || !((String) mode).toLowerCase(java.util.Locale.ROOT).contains("retro")) return;
                         // POP's face retouch (libOPAlgoCamAiUnifySkin via faceBaseRetouchProcess) is set up
                     // for POP's stock 12.5M output and reads past its buffers on a 25M image (SIGSEGV
                     // in fp16Tofp32_neon_accelerate_convert). Captures with a face stay at 12.5M.

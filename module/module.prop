@@ -1,6 +1,6 @@
-id=omnicam_aura
-name=OmniCam Aura
-version=1.0.0
-versionCode=1
+id=omnicam_aura_x9spro
+name=OmniCam Aura · Find X9s Pro
+version=1.0.1-x9spro.1
+versionCode=1001
 author=local-port
-description=RICOH GR, POP and Find X10 feature completion for PMA110. Headless LSPosed companion.
+description=PME110 / Camera 7.006.105: original MTK pipelines, GR/POP and X10 resources. Paired LSPosed APK required.

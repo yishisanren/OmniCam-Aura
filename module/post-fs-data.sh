@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Bind the tested POP camera directories and GR ISP files.
+# Merge this firmware's own configuration and portable GR/POP resources.
 MODDIR=${0%/*}
 LOG=$MODDIR/bind.log
 set -u
@@ -56,6 +56,9 @@ bind_merged_dir() {
 
 : > "$LOG"
 log "begin"
+[ "$(getprop ro.product.model)" = PME110 ] || exit 0
+[ "$(getprop ro.build.display.id)" = 'PME110_17.0.0.102(CN01)' ] || exit 0
+[ "$(sha256sum /odm/lib64/libAlgoInterface.so | cut -d ' ' -f 1)" = 8e6ce18cefae51089b8318970daea3087fb6434fed42d55810bf7456df8d66e5 ] || exit 0
 
 for NAME in camera_unit_config camera_unit_feature_config.protobuf oplus_camera_config oplus_camera_algo_switch_config oplus_camera_aps_config; do
     bind_file "$MODDIR/payload/$NAME" "/odm/etc/camera/config/$NAME"
@@ -77,20 +80,4 @@ log "host_film=$(ls -l /odm/etc/camera/meishe_lut/fuji-nc.bin 2>&1)"
 log "retro_ini=$(ls -l /odm/etc/camera/basictone/setting_Retro/SimTool_Master.ini 2>&1)"
 log "host_setting=$(ls -d /odm/etc/camera/basictone/setting 2>&1)"
 
-for LENS in main wide tele ultratele; do
-    NAME="com.qti.tuned.lighthouse${LENS}.bin"
-    SOURCE="$MODDIR/payload/isp/$NAME"
-    TARGET="/odm/lib64/camera/$NAME"
-    chown root:root "$SOURCE"
-    chmod 0644 "$SOURCE"
-    chcon u:object_r:vendor_file:s0 "$SOURCE" 2>>"$LOG" || true
-    if mount --bind "$SOURCE" "$TARGET" >>"$LOG" 2>&1; then
-        log "isp bind ok $TARGET"
-    else
-        log "isp bind FAIL $TARGET"
-    fi
-done
-for NAME in gamma_preview_sdr_conf.json gamma_quick_sdr_conf.json gamma_preview_hdr_conf.json; do
-    bind_file "$MODDIR/payload/gamma/$NAME" "/odm/etc/camera/$NAME"
-done
 log "end"

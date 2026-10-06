@@ -1,0 +1,30 @@
+[
+  {
+    "file": "gr.bw.rgba.bin",
+    "source": "https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_oneplus_dodge/5cdea50164c2c9435e8612da132396877acd8730/proprietary/odm/etc/camera/meishe_lut/gr.bw.rgba.bin",
+    "git_blob": "5d4b9a15bc5dc309f6a25d6aa259d19ebf32499b",
+    "size": 98480,
+    "sha256": "983ac9d5a691182fa6685de85bacd2177110b304f388fe691d5b3ddaef47e1b5"
+  },
+  {
+    "file": "gr.hi.bw.rgba.bin",
+    "source": "https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_oneplus_dodge/5cdea50164c2c9435e8612da132396877acd8730/proprietary/odm/etc/camera/meishe_lut/gr.hi.bw.rgba.bin",
+    "git_blob": "3370a816534b7b4ebdad0075a7c621ace1a4f8ec",
+    "size": 107991,
+    "sha256": "b14d5f583784d1af7089b69611f4ae8e1cf2b016fcec0efd7b899c85dcf1007c"
+  },
+  {
+    "file": "gr.nega.rgba.bin",
+    "source": "https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_oneplus_dodge/5cdea50164c2c9435e8612da132396877acd8730/proprietary/odm/etc/camera/meishe_lut/gr.nega.rgba.bin",
+    "git_blob": "d8c95cd632518ba86012a2d763b28afd80966de6",
+    "size": 98480,
+    "sha256": "d176b014cac5f642e4ead0af8d79fe23b0354e6a3d213f444d5e6f6e1e4ae095"
+  },
+  {
+    "file": "gr.posi.rgba.bin",
+    "source": "https://raw.githubusercontent.com/TheMuppets/proprietary_vendor_oneplus_dodge/5cdea50164c2c9435e8612da132396877acd8730/proprietary/odm/etc/camera/meishe_lut/gr.posi.rgba.bin",
+    "git_blob": "13e37b81c31405bbba191f03af7569aa4b297de8",
+    "size": 24128,
+    "sha256": "ca265ce4df8109647274757412e98831f89b1d90975130e00fa07d3c763ab84c"
+  }
+]

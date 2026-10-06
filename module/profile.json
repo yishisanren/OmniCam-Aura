@@ -1,0 +1,36 @@
+{
+  "model": "PME110",
+  "firmware": "PME110_17.0.0.102(CN01)",
+  "camera": "7.006.105",
+  "apk_sha256": "b85fed9ae429fc70034b6b6bd81101f40d503d7f5448b14fc305258837bb16a0",
+  "algo_sha256": "8e6ce18cefae51089b8318970daea3087fb6434fed42d55810bf7456df8d66e5",
+  "basictone_sha256": "57941d57cb81bebb5eb52bf5779bdee7e2932ea038efb590cbe1c8837457ebbe",
+  "changed_config_keys": [
+    "com.oplus.gr.mode.support",
+    "com.oplus.available.gr.mode.zoomvalues",
+    "com.oplus.gr.mode.marked.zoomvalues",
+    "com.oplus.camera.gr.raw.capture_defer.not.support",
+    "com.oplus.feature.retro.camera.support",
+    "com.oplus.feature.retro.camera.livephoto.output.size",
+    "com.oplus.camera.retro.fisheye.enable",
+    "com.oplus.feature.color.palette.support",
+    "com.oplus.ipu.color.palette.texture.support",
+    "com.oplus.feature.aicomposition.realscene.support",
+    "com.oplus.flashlevel.configurable.support",
+    "com.oplus.camera.mode.data.db.version"
+  ],
+  "gr_zoom": "0.6(15),1(23),2.8(65),5.6(130)",
+  "untouched": [
+    "camera IDs",
+    "device_info",
+    "MTK vendor tags",
+    "all original use cases",
+    "all original protobuf modes and their existing feature nodes",
+    "all original gamma and ISP files",
+    "libAlgoInterface.so"
+  ],
+  "not_enabled": [
+    "AI inspiration remote credentials",
+    "Qualcomm ISP replacements"
+  ]
+}
