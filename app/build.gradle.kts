@@ -2,6 +2,10 @@ plugins {
     id("com.android.application")
 }
 
+// Set this before Android resolves its default ProGuard file locations.
+// Cloud sync can create duplicate generated files in a checkout's build directory.
+providers.gradleProperty("auraBuildDir").orNull?.let { layout.buildDirectory.set(file(it)) }
+
 android {
     namespace = "local.omnicam.aura"
     compileSdk = 37
@@ -63,9 +67,6 @@ android {
         jniLibs.useLegacyPackaging = false
     }
 }
-
-// Cloud sync can create duplicate generated class/resource files during a build.
-providers.gradleProperty("auraBuildDir").orNull?.let { layout.buildDirectory.set(file(it)) }
 
 dependencies {
     compileOnly(files("libs/api-82.jar"))
