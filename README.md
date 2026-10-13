@@ -2,7 +2,7 @@
 
 为 OPPO Find X9s Pro 移植 GR、POP、清透/琥珀滤镜和调色盘的 KernelSU 模块与 LSPosed 插件。基于 [benbaobaoshigemi/OmniCam-Aura](https://github.com/benbaobaoshigemi/OmniCam-Aura)，以本机 MTK 原厂配置为基础，保留镜头、ISP、gamma 和 AlgoInterface。
 
-**下载：[Release v1.0](https://github.com/yishisanren/OmniCam-Aura/releases/tag/v1.0)** · [详细移植及验收记录](PORTING.md) · [更新记录](CHANGELOG.md)
+**新版：[Release v1.1](https://github.com/yishisanren/OmniCam-Aura/releases/tag/v1.1)** · [详细移植及验收记录](PORTING.md) · [更新记录](CHANGELOG.md)
 
 ![OmniCam Aura 图标](artwork/OmniCam-Aura.png)
 
@@ -12,14 +12,26 @@
 | --- | --- |
 | 机型 | OPPO Find X9s Pro，型号 `PME110` |
 | 平台 | MediaTek `MT6993` |
-| 系统 | ColorOS 17 / Android 17，固件 `PME110_17.0.0.102(CN01)` |
-| 原厂相机 | `7.006.105`，位于 `/product/app/OplusCamera/OplusCamera.apk` |
-| Root 环境 | KernelSU / SukiSU，启用 NoMount metamodule |
+| 系统 | ColorOS 17 / Android 17，固件 `PME110_17.0.0.103(CN01)` |
+| 原厂相机 | `7.006.121`，位于 `/product/app/OplusCamera/OplusCamera.apk` |
+| Root 环境 | KernelSU，本次实机为 Mountify `2.0.4`；保留 NoMount 路径支持 |
 | Hook 环境 | LSPosed；本次实机为 `2.2.1 (7912)` |
 
 这是指定固件的移植版，不是 Find X9 系列通用包。上游 Find X9 Ultra 的 Qualcomm 配置不能直接用于本机。安装器校验机型、固件、原厂相机及算法库；OTA 或相机更新后应重新验证，不能仅凭机型名称继续使用。
 
 ## 功能与验证状态
+
+v1.1 已覆盖安装、重启并完成当前固件复测。构建、lint、签名、原厂配置守恒及相机 195 项／相册 20 项接口匹配通过；相机进程实际可见的 14 项配置、库和 LUT 指纹全部匹配，四个 OverlayFS 挂载只读，资源自动初始化完成。
+
+| v1.1 本次实测 | 结果与边界 |
+| --- | --- |
+| 普通照片 | 保存并完整解码 |
+| GR 单色、高对比度黑白 | 均保存并完整解码；成片中心区域通过灰度检查，原生处理和 LUT 加载有运行日志 |
+| POP 后摄胶片、CCD | 均保存并完整解码 |
+| 超清清透滤镜 | 面板展开、选择及拍照保存通过；本次清透和标准样片均为 3084×4612，未达到界面标称 5000 万像素，原因未定位。5000 万／2 亿像素输出不列为新版通过项 |
+| 模式切换后的 4K 录像 | 3840×2160、HEVC＋AAC，约 27.0 秒、平均约 60fps，完整解码通过；测试期间相机进程未重启，未发现该进程崩溃记录 |
+
+以下为 v1.0 在固件 17.0.0.102 / 相机 7.006.105 上的历史实测，未在本次复测的组合不能沿用为 v1.1 通过项。
 
 | 功能 | 实测结果 |
 | --- | --- |
@@ -36,6 +48,7 @@
 
 ### 已知问题
 
+- v1.1 超清模式界面标称 5000 万像素，但本次标准和清透样片均输出 3084×4612（含水印边框）。尚未确定是当前设置、原厂流程还是移植影响；不要据此认为已获得完整 5000 万／2 亿像素成片。
 - 后期测试曾出现录像提示“录制时间过短”、没有保存文件的现象。重启后三段 4K 录像恢复，时长约 17.4、7.4、22.1 秒；两段长录像平均约 60fps。根因尚未确定，不能承诺长时间运行后不再发生。
 - 停用 Aura 的 LSPosed Hook 后也复现过录像异常，但当时配置和库覆盖仍在，这不是完整原厂对照，不能据此排除移植影响。遇到复发应保留日志，再按下方步骤回退排查。
 - 远距离自动对焦、RAW、低光画质、长期连续运行和全部滤镜/美颜/柔光组合尚未验收。静物场景的人像照片不能证明虚化质量。
@@ -43,23 +56,25 @@
 
 ## 安装
 
-在 [v1.0 发行页](https://github.com/yishisanren/OmniCam-Aura/releases/tag/v1.0) 下载同一发行版的两个安装包：
+在 [v1.1 发行页](https://github.com/yishisanren/OmniCam-Aura/releases/tag/v1.1) 下载同一发行版的两个安装包：
 
-- `OmniCam-Aura-1.0.1-x9spro.1-KSU.zip`：KernelSU 模块。
-- `OmniCam-Aura-1.0.1-x9spro.1.apk`：LSPosed 插件。
+- `OmniCam-Aura-1.1.0-x9spro.1-KSU.zip`：KernelSU 模块。
+- `OmniCam-Aura-1.1.0-x9spro.1.apk`：LSPosed 插件。
 
-1. 确认上表的固件与相机版本，并启用 NoMount metamodule。停用其他 OmniCam Aura / Muse 模块，避免相机 Hook 和资源重叠。
+1. 确认上表的固件与相机版本，并启用 Mountify 或 NoMount metamodule。停用其他 OmniCam Aura / Muse 模块，避免相机 Hook 和资源重叠。
 2. 在 KernelSU / SukiSU 中安装 ZIP。
 3. 安装 APK，在 LSPosed 启用 `local.omnicam.aura`，只勾选相机 `com.oplus.camera` 和相册 `com.coloros.gallery3d`。
 4. 重启并解锁，等待模块资源初始化，再打开原厂相机。可在模式栏选择 POP 和理光 GR。
 
 APK 没有桌面图标和独立设置入口，功能通过原厂相机及相册使用。若安装器拒绝当前固件，不要删掉校验强行安装。
 
-`v1.0` 是本仓库首次 Find X9s Pro 移植发行版；内部构建版本保留为 `1.0.1-x9spro.1`。发行资产与已安装实测的 APK/ZIP 保持逐字节一致，不为发布重命名内部版本。下载后可用发行页的 `SHA256SUMS.txt` 校验文件。
+`v1.1` 的内部构建版本为 `1.1.0-x9spro.1`。固件 17.0.0.102 / 相机 7.006.105 仍对应旧 [v1.0](https://github.com/yishisanren/OmniCam-Aura/releases/tag/v1.0)，请按固件选择配套 APK/ZIP。下载后可用发行页的 `SHA256SUMS.txt` 校验文件。
+
+APK 在配套资源未完整加载、配置或库指纹不符时保持原厂相机行为；只安装 APK 或尚未重启不会启用移植拍摄链路。
 
 ## 回退与卸载
 
-首次解锁初始化时，模块会备份它要覆盖的资源目录到 `/data/adb/omnicam_aura_x9spro_backup`，更新时保留备份。模块通过挂载和 NoMount 覆盖资源，不直接改写系统分区。
+首次解锁初始化时，模块会备份它要覆盖的资源目录到 `/data/adb/omnicam_aura_x9spro_backup`，更新时保留备份。模块通过文件挂载及受校验的库覆盖加载资源，不直接改写系统分区。
 
 正常卸载：先解锁，关闭相机和相册，从 KernelSU / SukiSU 卸载 `omnicam_aura_x9spro`，在 LSPosed 停用 Aura，然后重启。恢复脚本只处理模块覆盖的资源，不删除照片或账号。
 
@@ -85,7 +100,7 @@ sh tools/build_x9spro.sh
 
 默认使用 Android 调试签名。自行构建通常会使用不同的本地调试证书，不能直接覆盖发行版 APK。使用自己的证书时可设置 `OMNICAM_KEYSTORE`、`OMNICAM_STORE_PASSWORD`、`OMNICAM_KEY_ALIAS`、`OMNICAM_KEY_PASSWORD`；不要提交证书和密码。
 
-`tools/prepare_x9spro.py` 用于从原厂快照重新生成配置，`tools/verify_x9spro.py` 用于配置与包校验。原厂快照、真机媒体、账号数据、运行日志、签名密钥及本机工具缓存不会提交到 Git。真机辅助脚本通过 `AURA_DEVICE_SERIAL` 指定设备，读回检查还依赖安装前的私有快照。
+`tools/prepare_x9spro.py` 用于从原厂快照重新生成配置（用 `AURA_STOCK_DIR` 指向当前固件快照，目录内 `device-profile.json` 记录 model、firmware、camera 和 camera_apk），`tools/verify_x9spro.py` 用于配置与包校验。原厂快照、真机媒体、账号数据、运行日志、签名密钥及本机工具缓存不会提交到 Git。真机辅助脚本通过 `AURA_DEVICE_SERIAL` 指定设备，读回检查还依赖安装前的私有快照。
 
 ## 来源与许可
 

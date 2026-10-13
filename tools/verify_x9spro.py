@@ -9,7 +9,7 @@ import subprocess
 from zipfile import ZipFile
 from prepare_x9spro import ROOT, STOCK, MODULE, read_json, parse_wire
 
-VERSION = '1.0.1-x9spro.1'
+VERSION = next(line.split('=', 1)[1] for line in (MODULE / 'module.prop').read_text().splitlines() if line.startswith('version='))
 APK = ROOT / f'dist/OmniCam-Aura-{VERSION}.apk'
 ZIP = ROOT / f'dist/OmniCam-Aura-{VERSION}-KSU.zip'
 
@@ -154,6 +154,23 @@ def check_package():
         require(apk.read('assets/xposed_init').strip() == b'local.omnicam.aura.ModuleEntry', 'Wrong Xposed entry')
         require(apk.read('assets/native_init').strip() == b'libaura_native.so', 'Wrong native entry')
         require('lib/arm64-v8a/libaura_native.so' in apk.namelist(), 'Native Hook absent')
+        require(apk.read('assets/device_profile.json') == (MODULE / 'profile.json').read_bytes(), 'APK and module device profiles differ')
+        native = apk.read('lib/arm64-v8a/libaura_native.so')
+        fingerprint = hashlib.sha256((MODULE / 'profile.json').read_bytes()).hexdigest().encode()
+        require(fingerprint in native, 'Native activation guard uses a stale device profile')
+        profile = read_json(MODULE / 'profile.json')
+        require(profile['version'] == VERSION, 'APK activation profile uses a different module version')
+        for target, expected in profile['mounted_files'].items():
+            if target.startswith('/odm/etc/camera/config/'):
+                source = MODULE / 'payload' / Path(target).name
+            elif target.startswith('/odm/etc/camera/meishe_lut/'):
+                source = MODULE / 'payload/meishe_lut' / Path(target).name
+            elif target == '/odm/lib64/libAlgoInterface.so':
+                require(expected == profile['algo_sha256'], 'Original AlgoInterface fingerprint differs')
+                continue
+            else:
+                source = MODULE / 'system' / target.lstrip('/')
+            require(hashlib.sha256(source.read_bytes()).hexdigest() == expected, 'Runtime readiness fingerprint differs: ' + target)
     manifest = subprocess.check_output([str(build_tools / 'aapt2'), 'dump', 'xmltree', str(APK), '--file', 'AndroidManifest.xml'], text=True)
     badging = subprocess.check_output([str(build_tools / 'aapt2'), 'dump', 'badging', str(APK)], text=True)
     require("name='local.omnicam.aura'" in badging and f"versionName='{VERSION}'" in badging, 'Wrong package/version')
@@ -177,7 +194,7 @@ if __name__ == '__main__':
     parser.add_argument('--package-only', action='store_true', help='Validate the package without the private stock snapshot; does not validate stock configuration preservation')
     args = parser.parse_args()
     configuration = {'status': 'not run', 'reason': 'private stock snapshot not used (--package-only)'} if args.package_only else check_configuration()
-    result = {'configuration': configuration, 'packages': check_package(), 'device_tests': 'not run by static verifier; see evidence/device-acceptance.json'}
+    result = {'configuration': configuration, 'packages': check_package(), 'device_tests': 'not run by static verifier; matched-firmware runtime and media acceptance required'}
     (ROOT / 'evidence').mkdir(exist_ok=True)
     (ROOT / 'evidence/static-verification.json').write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps(result, ensure_ascii=False, indent=2))

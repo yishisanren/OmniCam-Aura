@@ -48,7 +48,13 @@ LibraryLoadedCallback native_init(const NativeApiEntries *entries) {
     char model[PROP_VALUE_MAX]{}, firmware[PROP_VALUE_MAX]{};
     __system_property_get("ro.product.model", model);
     __system_property_get("ro.build.display.id", firmware);
-    if (std::strcmp(model, "PME110") || std::strcmp(firmware, "PME110_17.0.0.102(CN01)")) { activationState = -1; return nullptr; }
+    if (std::strcmp(model, AURA_MODEL) || std::strcmp(firmware, AURA_FIRMWARE)) { activationState = -1; return nullptr; }
+    char marker[65]{};
+    FILE *resourceMarker = std::fopen("/data/user/0/com.oplus.camera/files/ricoh_gr/aura_profile.sha256", "r");
+    if (!resourceMarker) { activationState = -3; return nullptr; }
+    size_t size = std::fread(marker, 1, 64, resourceMarker);
+    std::fclose(resourceMarker);
+    if (size != 64 || std::strcmp(marker, AURA_PROFILE_SHA256)) { activationState = -3; return nullptr; }
     if (!entries || !entries->hook) { activationState = -2; return nullptr; }
     installHook = entries->hook;
     installPopPathRemap(installHook);

@@ -8,11 +8,12 @@ from pathlib import Path
 import copy
 import hashlib
 import json
+import os
 import re
 import shutil
 
 ROOT = Path(__file__).resolve().parent.parent
-STOCK = ROOT / 'evidence/original'
+STOCK = Path(os.environ.get('AURA_STOCK_DIR', ROOT / 'evidence/original'))
 DONOR = ROOT / 'evidence/upstream-module'
 MODULE = ROOT / 'module'
 
@@ -173,6 +174,8 @@ def feature_overlay():
 
 
 def main():
+    device = read_json(STOCK / 'device-profile.json')
+    assert device['model'] == 'PME110', 'Only the inspected MTK device is supported'
     unit = read_json(STOCK / 'config/camera_unit_config')
     original_unit = copy.deepcopy(unit)
     for camera, modes in unit['mode_type_list'].items():
@@ -253,8 +256,9 @@ def main():
     # The router's X9 backend is THIS device's original BasicTone, not the Qualcomm donor.
     shutil.copy2(STOCK / 'libBasicTonePhoto.so', MODULE / 'system/odm/lib64/libBasicTonePhotoX9.so')
     report = {
-        'model': 'PME110', 'firmware': 'PME110_17.0.0.102(CN01)', 'camera': '7.006.105',
-        'apk_sha256': hashlib.sha256((STOCK / 'OplusCamera-7.006.105.apk').read_bytes()).hexdigest(),
+        'version': next(line.split('=', 1)[1] for line in (MODULE / 'module.prop').read_text().splitlines() if line.startswith('version=')),
+        'model': device['model'], 'firmware': device['firmware'], 'camera': device['camera'],
+        'apk_sha256': hashlib.sha256((STOCK / device['camera_apk']).read_bytes()).hexdigest(),
         'algo_sha256': hashlib.sha256((STOCK / 'libAlgoInterface.so').read_bytes()).hexdigest(),
         'basictone_sha256': hashlib.sha256((STOCK / 'libBasicTonePhoto.so').read_bytes()).hexdigest(),
         'changed_config_keys': changes,
@@ -263,7 +267,32 @@ def main():
                       'all original protobuf modes', 'all original gamma and ISP files', 'libAlgoInterface.so'],
         'not_enabled': ['AI inspiration remote credentials', 'Qualcomm ISP replacements'],
     }
+    report['mounted_files'] = {
+        '/odm/etc/camera/config/' + name: hashlib.sha256((MODULE / 'payload' / name).read_bytes()).hexdigest()
+        for name in ['camera_unit_config', 'camera_unit_feature_config.protobuf', 'oplus_camera_config',
+                     'oplus_camera_algo_switch_config', 'oplus_camera_aps_config']
+    }
+    for library in sorted((MODULE / 'system/odm/lib64').glob('*.so')):
+        report['mounted_files']['/odm/lib64/' + library.name] = hashlib.sha256(library.read_bytes()).hexdigest()
+    report['mounted_files']['/odm/lib64/libAlgoInterface.so'] = report['algo_sha256']
+    for lut in ['gr.bw.rgba.bin', 'gr.hi.bw.rgba.bin', 'gr.nega.rgba.bin', 'gr.posi.rgba.bin']:
+        report['mounted_files']['/odm/etc/camera/meishe_lut/' + lut] = hashlib.sha256((MODULE / 'payload/meishe_lut' / lut).read_bytes()).hexdigest()
     write_json(MODULE / 'profile.json', report)
+    write_json(ROOT / 'app/src/main/assets/device_profile.json', report)
+    (MODULE / 'device-profile.sh').write_text(
+        '#!/system/bin/sh\n'
+        + f"AURA_MODEL='{report['model']}'\nAURA_FIRMWARE='{report['firmware']}'\n"
+        + f"AURA_CAMERA_SHA256='{report['apk_sha256']}'\nAURA_ALGO_SHA256='{report['algo_sha256']}'\n"
+        + 'aura_device_matches() {\n'
+        + '    [ "$(getprop ro.product.model)" = "$AURA_MODEL" ] &&\n'
+        + '    [ "$(getprop ro.build.display.id)" = "$AURA_FIRMWARE" ] &&\n'
+        + '    [ "$(sha256sum /product/app/OplusCamera/OplusCamera.apk | cut -d " " -f 1)" = "$AURA_CAMERA_SHA256" ] &&\n'
+        + '    [ "$(sha256sum /odm/lib64/libAlgoInterface.so | cut -d " " -f 1)" = "$AURA_ALGO_SHA256" ]\n'
+        + '}\n'
+        + 'aura_mounts_match() {\n'
+        + ''.join('    [ "$(sha256sum ' + path + ' | cut -d " " -f 1)" = "' + digest + '" ] || return 1\n'
+                  for path, digest in report['mounted_files'].items())
+        + '    return 0\n}\n')
     write_json(ROOT / 'evidence/merge-report.json', report)
     print(json.dumps(report, ensure_ascii=False, indent=2))
 

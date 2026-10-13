@@ -1,17 +1,29 @@
 #!/system/bin/sh
+set -eu
 
 MODDIR=${0%/*}
 APP=/data/user/0/com.oplus.camera
 OUT=$APP/files/ricoh_gr/lmt
 BACKUPDIR=/data/adb/omnicam_aura_x9spro_backup
 
-[ "$(getprop ro.product.model)" = PME110 ] || exit 0
-[ "$(getprop ro.build.display.id)" = 'PME110_17.0.0.102(CN01)' ] || exit 0
+. "$MODDIR/device-profile.sh"
+aura_device_matches || exit 0
 exec >> "$MODDIR/stage.log" 2>&1
 
 until [ "$(getprop sys.boot_completed)" = 1 ] && [ "$(getprop sys.user.0.ce_available)" = true ] && [ -d "$APP" ]; do
     sleep 1
 done
+rm -f "$APP/files/ricoh_gr/aura_profile.sha256"
+# cmd package transfers stderr to system_server. A module log file cannot be
+# passed through that Binder call on this firmware; use the null device instead.
+if ! CAMERA_PATH=$(pm path com.oplus.camera 2>/dev/null); then
+    echo "PackageManager camera path query failed; activation marker withheld"
+    exit 1
+fi
+if [ "$CAMERA_PATH" != 'package:/product/app/OplusCamera/OplusCamera.apk' ]; then
+    echo "Uninspected active camera; activation marker withheld"
+    exit 0
+fi
 
 APP_UID=$(stat -c %u "$APP")
 # Back up only the exact resource paths the module will create or overwrite.
@@ -115,4 +127,9 @@ chown -R "$APP_UID:$APP_UID" "$CAM_ML"
 find "$CAM_ML" -type f -exec chmod 0644 {} \;
 find "$CAM_ML" -type d -exec chmod 0755 {} \;
 restorecon -R "$CAM_ML"
+aura_mounts_match || { echo "Camera mounts incomplete; activation marker withheld"; exit 1; }
+sha256sum "$MODDIR/profile.json" | cut -d ' ' -f 1 > "$APP/files/ricoh_gr/aura_profile.sha256"
+chown "$APP_UID:$APP_UID" "$APP/files/ricoh_gr/aura_profile.sha256"
+chmod 0644 "$APP/files/ricoh_gr/aura_profile.sha256"
+restorecon "$APP/files/ricoh_gr/aura_profile.sha256"
 echo "Resource staging complete"

@@ -5,7 +5,8 @@
 //   * BasicTone: the GR LMT/SC/CWCM tree (staged by service.sh) instead of the host ODM tree;
 //   * no artistic vignette from the V1 vignette parameters;
 //   * the Meishe V1 filter node (clarity, vignette, grain), run with the GR capture mode.
-// Offsets are verified against PME110_17.0.0.102 / Camera 7.006.105.
+// The inspected MTK binaries are byte-identical on PME110 .102 and .103.
+// hasBuildId guards the offsets; APK compatibility is checked independently.
 #include <android/log.h>
 #include <cstdint>
 #include <cstring>

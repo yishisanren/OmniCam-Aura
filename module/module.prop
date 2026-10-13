@@ -1,6 +1,6 @@
 id=omnicam_aura_x9spro
 name=OmniCam Aura · Find X9s Pro
-version=1.0.1-x9spro.1
-versionCode=1001
+version=1.1.0-x9spro.1
+versionCode=1101
 author=local-port
-description=PME110 / Camera 7.006.105: original MTK pipelines, GR/POP and X10 resources. Paired LSPosed APK required.
+description=PME110 17.0.0.103 / Camera 7.006.121: original MTK pipelines, GR/POP and X10 resources. Paired LSPosed APK required.

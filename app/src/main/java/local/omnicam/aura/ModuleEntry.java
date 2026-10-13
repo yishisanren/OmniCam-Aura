@@ -1,5 +1,4 @@
 package local.omnicam.aura;
-import android.os.Build;
 import android.app.Activity;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
@@ -16,14 +15,21 @@ import local.jiege.hook.pop.PopPort;
 import local.jiege.hook.x10.X10FilterPort;
 
 public final class ModuleEntry implements IXposedHookLoadPackage, IXposedHookZygoteInit {
-    @Override public void initZygote(StartupParam param) { Symbols.setModulePath(param.modulePath); }
+    @Override public void initZygote(StartupParam param) {
+        Symbols.setModulePath(param.modulePath);
+        DeviceGuard.load(param.modulePath);
+    }
     @Override public void handleLoadPackage(XC_LoadPackage.LoadPackageParam param) {
-        if (!"PME110".equals(Build.MODEL) || !"PME110_17.0.0.102(CN01)".equals(Build.DISPLAY)) return;
+        if (!DeviceGuard.matchesDevice()) return;
         ClassLoader loader = param.classLoader;
         if ("com.coloros.gallery3d".equals(param.packageName)) {
             Symbols.install("gallery", loader, param.appInfo.sourceDir, param.appInfo.dataDir);
             Log.guard("Aura", "gallery", () -> GrPort.installGallery(loader));
         } else if ("com.oplus.camera".equals(param.packageName)) {
+            if (!DeviceGuard.cameraReady(param.appInfo.sourceDir, param.appInfo.dataDir)) {
+                Log.i("Aura", "paired resources not active; keeping stock camera behavior");
+                return;
+            }
             Log.guard("Aura", "native", () -> {
                 System.loadLibrary("aura_native");
                 Log.i("Aura", "native " + NativeStatus.snapshot());

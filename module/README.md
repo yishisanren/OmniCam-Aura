@@ -1,11 +1,11 @@
-# OmniCam Aura 1.0.1-x9spro.1
+# OmniCam Aura 1.1.0-x9spro.1
 
-适配目标：Find X9s Pro（PME110），固件 PME110_17.0.0.102(CN01)，相机 7.006.105。
+适配目标：Find X9s Pro（PME110），固件 PME110_17.0.0.103(CN01)，相机 7.006.121。
 安装器校验机型、固件及原厂相机和算法库 SHA-256；其他组合会拒绝安装。
-已在上述真机验证 GR 五种风格及五个焦段、POP 前后摄及实况照片、超清清透滤镜约 5000 万/2 亿像素保存、调色盘交互及 GR 水印编辑后的成片。远距离自动对焦、RAW、长时间拍摄及全部参数组合尚未验收；仅供这组固件使用。
+当前固件已验证安装、重启初始化、相机进程挂载，以及普通照片、GR 两种黑白风格、POP 胶片/CCD 和约 27 秒 4K 60fps 录像保存与完整解码。超清清透可拍照，但本次标准/清透样片为 3084×4612，未达到界面标称 5000 万像素；5000 万/2 亿像素输出未通过新版验收。远距离自动对焦、RAW、长时间拍摄及全部参数组合尚未验收；仅供这组固件使用。
 
-安装此 KernelSU 模块后，安装同版配套 APK `OmniCam-Aura-1.0.1-x9spro.1.apk`，在 LSPosed 中启用并勾选相机 `com.oplus.camera` 和相册 `com.coloros.gallery3d`，然后重启并解锁。Aura 与 Muse 只能启用其一。
-需要启用 NoMount metamodule，动态库在固件校验通过后通过 NoMount 注册。APK 没有桌面图标。
+安装此 KernelSU 模块后，安装同版配套 APK `OmniCam-Aura-1.1.0-x9spro.1.apk`，在 LSPosed 中启用并勾选相机 `com.oplus.camera` 和相册 `com.coloros.gallery3d`，然后重启并解锁。Aura 与 Muse 只能启用其一。
+需要启用 Mountify 或 NoMount metamodule。Mountify 环境通过设备校验后，为配置、资源和库建立四个只读 OverlayFS；NoMount 环境保留原有 bind mount 与库路径规则。APK 没有桌面图标。
 
 移植保留本机 MTK 算法、镜头 ID、原厂模式、ISP 和 gamma。GR 模式提供 15/23/46/65/130mm；46mm 为主摄裁切，130mm 为长焦裁切，新增的 GR/POP 拍摄会话复用本机原厂流程。
 

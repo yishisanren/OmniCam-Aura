@@ -56,9 +56,15 @@ bind_merged_dir() {
 
 : > "$LOG"
 log "begin"
-[ "$(getprop ro.product.model)" = PME110 ] || exit 0
-[ "$(getprop ro.build.display.id)" = 'PME110_17.0.0.102(CN01)' ] || exit 0
-[ "$(sha256sum /odm/lib64/libAlgoInterface.so | cut -d ' ' -f 1)" = 8e6ce18cefae51089b8318970daea3087fb6434fed42d55810bf7456df8d66e5 ] || exit 0
+. "$MODDIR/device-profile.sh"
+aura_device_matches || exit 0
+if [ -f /data/adb/modules/mountify/metamount.sh ] && [ ! -e /data/adb/modules/mountify/disable ] &&
+   ! { [ -x /data/adb/modules/nomount/bin/nm ] && [ ! -e /data/adb/modules/nomount/disable ]; }; then
+    # On this Mountify setup, the camera namespace drops individual bind mounts.
+    # post-mount.sh stages both configuration and resources on guarded ext4 overlays.
+    log "configuration and resources deferred to camera overlays"
+    exit 0
+fi
 
 for NAME in camera_unit_config camera_unit_feature_config.protobuf oplus_camera_config oplus_camera_algo_switch_config oplus_camera_aps_config; do
     bind_file "$MODDIR/payload/$NAME" "/odm/etc/camera/config/$NAME"
